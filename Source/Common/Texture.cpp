@@ -1,14 +1,6 @@
 #include "Common.h"
 #include "Texture.h"
 
-Texture::Texture(size_t piWidth, size_t piHeight, size_t pType, unsigned char * pData)
-:   m_iWidth(piWidth),
-    m_iHeight(piHeight),
-    m_Type(pType)
-{
-    m_pData = pData;
-}
-
 Texture::Texture(std::string pszFileName)
 {
     ILuint  _iImageId   = 0;
@@ -59,14 +51,14 @@ Texture::~Texture()
     m_pfData    =   NULL;
 }
 
-void    Texture::SaveAs(std::string pszFileName)
+void Texture::SaveAs(std::string pszFileName, size_t piWidth, size_t piHeight, size_t pType, size_t pFmt, void * pData)
 {
     ILuint  _iImageId   = 0;
 
     _iImageId = ilGenImage();
     ilBindImage(_iImageId);
 
-    ASSERT(  ilTexImage(m_iWidth,    m_iHeight, 0, 3, IL_RGB, IL_BYTE, m_pData) == IL_TRUE  , "Texture: Unable to set data!");
+    ASSERT(  ilTexImage(piWidth,    piHeight, 0, 3, pType, pFmt, pData) == IL_TRUE  , "Texture: Unable to set data!");
     VERIFY(  ilSaveImage(pszFileName.c_str()) == IL_TRUE  , "Texture: Unable to save Image!");
 
     ilDeleteImage(_iImageId);
@@ -77,10 +69,12 @@ float * Texture::GenerateGrayDataF()
     float   *   _pData      =  new float[m_iHeight * m_iWidth];
     size_t      _iImageSize =   m_iHeight * m_iWidth;
 
+    //Y = .2126 * R^gamma + .7152 * G^gamma + .0722 * B^gamma
     for(size_t i = 0; i < _iImageSize; i ++)
     {
-        _pData[i] = m_pfData[i * 3] + m_pfData[i * 3 + 1] + m_pfData[i * 3 + 2];
-        _pData[i] = _pData[i] / 3.0f;
+        _pData[i] += m_pfData[i * 3] * 0.2126f;
+        _pData[i] += m_pfData[i * 3 + 1] * 0.7152f;
+        _pData[i] += m_pfData[i * 3 + 2] * 0.0722f;
     }
     return      _pData;
 }

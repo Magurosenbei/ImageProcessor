@@ -51,8 +51,6 @@ void    Program::Run()
     //for(size_t i = 0; i < _iImageSize; i++)
     //    _pfDMatrix[i] = new float[_iAlpha];
 
-
-
     float * _pfImageR   = m_pImage1->GenerateGrayDataF();
     float * _pfImageL   = m_pImage2->GenerateGrayDataF();
 
@@ -63,21 +61,22 @@ void    Program::Run()
     size_t  _iHeight    = m_pImage1->Height();
     float   _fImgCal    = 0.0f;
     float   _fImgCalLog = 0.0f;
-    float   _fDivisor   = 1.0f /  ( (2 * _iGagueW + 1) * 0.5f * log(2.0f));
+    float   _fDivisor   = 1.0f /  ( (2 * _iGagueW + 1) * 0.5f * logf(2.0f));
+    float   _fFactor    = 1.0f / (_iAlpha - 1);
 
     printf("\nBuidling DCost\n");
     m_Timer.Start();
 
-#pragma omp parallel
+//#pragma omp parallel
 {
-    #pragma omp parallel for private(_fImgCal, _fImgCalLog, _fAlpha)
-    for(size_t y = 0; y < m_pImage1->Height(); y++)
+    //#pragma omp parallel for private(_fImgCal, _fImgCalLog, _fAlpha)
+    for(size_t y = 0; y < _iHeight; y++)
     {
-        for(size_t x = 0; x < m_pImage1->Width(); x++)
+        for(size_t x = 0; x < _iWidth; x++)
         {
             for(size_t z = 0; z < _iAlpha; z++)
             {
-                _fAlpha = static_cast<float>(z - 1) / static_cast<float>(_iAlpha - 1);
+                _fAlpha = static_cast<float>(z) / static_cast<float>(_iAlpha - 1);
                 if( y - _iGagueW > 0 &&
                     y + _iGagueW < _iHeight  &&
                     x + _iGagueW < _iWidth   &&
@@ -88,17 +87,18 @@ void    Program::Run()
                     {
                         for(size_t i = -_iGagueW; i <= _iGagueW; i++)
                         {
-                            _fImgCalLog =   _fAlpha * _pfImageL[((y + j) * x) + (x + i)] +
-                                            (1.0f - _fAlpha) * _pfImageR[((y + j) * x) + (x + i)];
-                            _fImgCal += _fImgCalLog + log(_fImgCalLog);
+                            _fImgCalLog =   _pfImageL[((y + j) * _iWidth) + (x + i)] * _fAlpha;
+                            _fImgCalLog +=  _pfImageR[((y + j) * _iWidth) + (x + i)] * (1.0f - _fAlpha);
+                            _fImgCal += _fImgCalLog * logf(_fImgCalLog);
                         }
-                        //cost[p*nLabels+l]
-                        //_pfDMatrix[((y * x) + x)][z] = exp(_fImgCal) * _fDivisor;
-                        _pfDMatrix[((y * x) + x) * _iAlpha + z] = exp(_fImgCal) * _fDivisor;
+                        //  Summation of WxW around pix(X, Y), with the log of itself
+                        _pfDMatrix[((y * _iWidth) + x) * _iAlpha + z] = expf(_fImgCal * _fDivisor);
+                        _pfDMatrix[((y * _iWidth) + x) * _iAlpha + z] = std::max(_pfDMatrix[((y * _iWidth) + x) * _iAlpha + z], 0.0f);
+                        _pfDMatrix[((y * _iWidth) + x) * _iAlpha + z] = std::min(_pfDMatrix[((y * _iWidth) + x) * _iAlpha + z], 1.0f);
                     }
                 }
                 else
-                    _pfDMatrix[((y * x) + x) * _iAlpha + z] = 1;//_pfDMatrix[(y * x) + x][z] = 1;
+                    _pfDMatrix[((y * _iWidth) + x) * _iAlpha + z] = 1;
             }
         }
     }
@@ -108,48 +108,14 @@ void    Program::Run()
     m_Timer.Start();
     //  Compute S Matrix
     //  V(l1,l2) = smooth[l1+numberofLabels*l2] = smooth[l2+numberofLabels*l1]
-    /*
-    [X,Y] = meshgrid(1:3,10:14)
-    X =
-         1     2     3
-         1     2     3
-         1     2     3
-         1     2     3
-         1     2     3
+    //  [X,Y] = meshgrid(1:3,10:14)
+    //  S = abs( (X - 1)/(nAlpha - 1) - (Y - 1)/(nAlpha - 1));
 
-    Y =
-        10    10    10
-        11    11    11
-        12    12    12
-        13    13    13
-        14    14    14
-    */
-    //S = abs( (X - 1)/(nAlpha - 1) - (Y - 1)/(nAlpha - 1));
-    {
-        float       _fFactor    = 1.0f / (_iAlpha - 1);
-        //float  *    _ftX        =   new float[_iAlpha * _iAlpha];
-        //float  *    _ftY        =   new float[_iAlpha * _iAlpha];
-        //#pragma omp parallel for
-        for(size_t j = 0; j < _iAlpha; j++)
-        {
-            for(size_t i = 0; i < _iAlpha; i++)
-            {
-                //_ftX[((j * i) + i)] = i;
-                //_ftY[((j * i) + i)] = j;
-                _pfSMatrix[(j * _iAlpha) + i] = fabsf(_fFactor * i - _fFactor * j);
-                //_pfSMatrix[(i * _iAlpha) + j] = _pfSMatrix[(j * _iAlpha) + i];
-            }
-        }
-        /*for(size_t j = 0; j < _iAlpha; j++)
-        {
-            for(size_t i = 0; i < _iAlpha; i++)
-            {
-                _pfSMatrix[(j * _iAlpha) + i] = fabsf(_fFactor * _ftX[((j * i) + i)] - _fFactor * _ftY[((j * i) + i)]);
-                _pfSMatrix[(i * _iAlpha) + j] = _pfSMatrix[(j * _iAlpha) + i];
-                //_pfSMatrix[((j * i) + i)] = fabsf(_ftX[(j * _iAlpha) + i] - _ftY[(i * _iAlpha) + j]);
-            }
-        }*/
-    }
+    //#pragma omp parallel for
+    for(size_t j = 0; j < _iAlpha; j++)
+        for(size_t i = 0; i < _iAlpha; i++)
+            _pfSMatrix[(j * _iAlpha) + i] = fabsf(_fFactor * i - _fFactor * j);
+
     printf("\nEnd Time : %f ms", m_Timer.End());
     printf("\nGC Process\n");
     //  Graph Cut
@@ -163,18 +129,22 @@ void    Program::Run()
     m_Timer.Start();
     m_pMRF->initialize();
     m_pMRF->clearAnswer();
-    m_pMRF->optimize(5, _fTime);
+    m_pMRF->optimize(0, _fTime);
 
     MRF::EnergyVal E_smooth = m_pMRF->smoothnessEnergy();
     MRF::EnergyVal E_data   = m_pMRF->dataEnergy();
     printf("\n(Smoothness energy %f, Data Energy %f)\n", E_smooth, E_data);
 
-
     printf("\nEnd Time : %f ms %f s", m_Timer.End(), _fTime);
+    int _iPrev = 0;
     for (size_t pix = 0; pix < _iImageSize; pix++ )
-        printf("\nLabel of pixel %i is %i", (int)pix, m_pMRF->getLabel(pix));
-
-
+    {
+        if(_iPrev != m_pMRF->getLabel(pix))
+        {
+            printf("\nLabel of pixel %i is %i", (int)pix, m_pMRF->getLabel(pix));
+            _iPrev =  m_pMRF->getLabel(pix);
+        }
+    }
 
     /*%% fusion of I1, I2 to create I.
     wMap = (double(labels))/(nAlpha-1);
@@ -183,18 +153,24 @@ void    Program::Run()
     I(:,:,1) = double(I1(:,:,1)).*wMap + double(I2(:,:,1)).*(1-wMap);
     I(:,:,2) = double(I1(:,:,2)).*wMap + double(I2(:,:,2)).*(1-wMap);
     I(:,:,3) = double(I1(:,:,3)).*wMap + double(I2(:,:,3)).*(1-wMap);
-    figure, imshow(uint8(round(I))),title('Fused Color Img');
-    imwrite(uint8(round(I)),'I.png','png');
-    p1 = imhist(imgL)./numel(imgL); p2 = imhist(imgR)./numel(imgR); p3 = imhist(hdr)./numel(hdr);
-    p1(p1==0) = 1; p2(p2==0) = 1;p3(p3==0) = 1;
-    avgInfVal1 = sum(-p1.*log(p1)); avgInfVal2 = sum(-p2.*log(p2)); avgInfVal3 = sum(-p3.*log(p3));
-    fprintf(1,'Information val left->%f right->%f fused->%f\n',avgInfVal1,avgInfVal2,avgInfVal3);
     */
+    printf("\nGenerating Image ...");
+    unsigned char *   _fNewImgRGB =   new unsigned char[_iImageSize * 3];
+    size_t      _iPixIndex  =   0;
+    float       _fLabel     =   0.0f;
+    for(size_t y = 0; y < _iHeight; y++)
+    {
+        for(size_t x = 0; x < _iWidth; x++)
+        {
+            _iPixIndex = (y * _iWidth + x) * 3;
 
-    /*Texture *   _NTex = new Texture(m_pImage1->Width(), m_pImage1->Height(), m_pImage1->Type(),
-                                    _pfDMatrix);
-
-    _NTex->SaveAs("Data/Test.png");*/
+            _fLabel = m_pMRF->getLabel(y * _iWidth + x) * _fFactor;
+            _fNewImgRGB[_iPixIndex]      =   _fLabel * m_pImage1->Data()[_iPixIndex]      +   (1.0f - _fLabel) * m_pImage2->Data()[_iPixIndex];
+            _fNewImgRGB[_iPixIndex + 1]  =   _fLabel * m_pImage1->Data()[_iPixIndex + 1]  +   (1.0f - _fLabel) * m_pImage2->Data()[_iPixIndex + 1];
+            _fNewImgRGB[_iPixIndex + 2]  =   _fLabel * m_pImage1->Data()[_iPixIndex + 2]  +   (1.0f - _fLabel) * m_pImage2->Data()[_iPixIndex + 2];
+        }
+    }
+    Texture::SaveAs("Data/Test.png", _iWidth, _iHeight, IL_RGB, IL_UNSIGNED_BYTE, _fNewImgRGB);
 
     delete      _pDCost;
     delete      _pSCost;
@@ -218,9 +194,14 @@ int main(int nArgument, char *  szArgument[])
 {
     printf("\nProgram Start\n");
     Program _Program;
-    _Program.Initialize(nArgument, szArgument);
-    _Program.Run();
-    _Program.Shutdown();
+    for(int i = 0 ; i < 10; i++)
+    {
+        printf("\nTest Iteration : %i", i);
+        _Program.Initialize(nArgument, szArgument);
+        _Program.Run();
+        _Program.Shutdown();
+    }
+
     printf("\nProgram End\n");
     return 0;
 }

@@ -40,16 +40,13 @@
 		</Compiler>
 		<Linker>
 			<Add library="gomp" />
-			<Add library="GLEW" />
-			<Add library="GL" />
-			<Add library="GLU" />
 			<Add library="X11" />
-			<Add library="/usr/local/lib/libIL.a" />
-			<Add library="/usr/local/lib/libILU.a" />
-			<Add library="/usr/local/lib/libILUT.a" />
-			<Add library="/usr/local/lib/libpng.a" />
-			<Add library="/usr/local/lib/libjpeg.a" />
-			<Add library="/usr/local/lib/libz.a" />
+			<Add library="Lib/libDevIL/libIL.a" />
+			<Add library="Lib/libDevIL/libILU.a" />
+			<Add library="Lib/libDevIL/libILUT.a" />
+			<Add library="Lib/libpng/libpng.a" />
+			<Add library="Lib/libjpeg/libjpeg.a" />
+			<Add library="Lib/libz/libz.a" />
 			<Add library="Lib/MRF/libMRF.a" />
 		</Linker>
 		<Unit filename="Source/Common/Common.h" />
@@ -58,10 +55,6 @@
 		<Unit filename="Source/Common/Texture.h" />
 		<Unit filename="Source/Common/Tools.cpp" />
 		<Unit filename="Source/Common/Tools.h" />
-		<Unit filename="Source/OGL.cpp">
-			<Option compiler="gcc" use="0" buildCommand="-lGL\n-lGLU\n-lX11\n-lXxf86vm" />
-		</Unit>
-		<Unit filename="Source/OGL.h" />
 		<Unit filename="Source/Program.cpp" />
 		<Unit filename="Source/Program.h" />
 		<Extensions>

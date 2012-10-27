@@ -9,11 +9,9 @@ protected:
     unsigned char *     m_pData;
     size_t              m_Type;
 
-    float   *   m_pfData;
+    float         *     m_pfData;       //  Gray Scale
 public:
     Texture(std::string pszFileName);
-    Texture(size_t piWidth, size_t piHeight, size_t pType, unsigned char * pData);
-
     ~Texture();
 
     const   size_t          Type()      {   return  m_Type;     }
@@ -26,7 +24,14 @@ public:
     const   float   *       FData()     {   return  m_pfData;   }
 
     //@param    pszFileName :   Must Include Extension
-            void            SaveAs(std::string pszFileName);
+    //@param    piWidth     :   Width in pixels
+    //@param    piHeight    :   Height in pixels
+    //@param    pType       :   RGB / RGBA
+    //@param    pFmt        :   Data type of pData
+    //@param    pData       :   Pointer to pixel memory
+    //@throws   Exception   :   Failed to create file or set image data to DevIL
+    static  void            SaveAs(std::string pszFileName, size_t piWidth, size_t piHeight, size_t pType, size_t pFmt, void * pData);
+    //@return               :   Array of Floats in Gray Scale of Width * Height
             float   *       GenerateGrayDataF();
 };
 
